@@ -38,7 +38,7 @@ manifold:
 
 ## Results — RepOD dataset (13 sick, 13 healthy, 19-channel EEG, 250 Hz)
 
-![pic2]("channel explorer.png")
+![pic2]("channel sweep.png")
 
 ### Channel sweep — spread ratio ranked
 
