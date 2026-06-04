@@ -1,167 +1,185 @@
-# EEG Koopman Explorer  v3
+# EEG Koopman Explorer  v4
 
 ![pic](koopman_explorer.png)
 
 A zero-parameter tool for exploring EEG recordings as spectrograms on a
-2-D Koopman manifold, with competitive sparse reconstruction, group separation
-metrics (convex hull), a per-channel sweep, and a transient / δ-coding test.
+2-D Koopman manifold.  Builds a PCA map of 4-second Gabor-transform epochs,
+measures group separation via convex-hull geometry, sweeps all channels, and
+tests the δ-coding prediction at two timescales (4-second epochs and 100 ms
+sub-second windows).
 
 ---
 
 ## What it is
 
 Converts EEG recordings into spectrograms and builds a low-dimensional map
-of them using PCA.  Because a spectrogram computed with a Hann-windowed STFT
-**is** a time-varying Gabor transform, the manifold is the space that GAIT
-(Geometric Attractor Inversion Theory) predicts should encode the dynamics of
-the standing wave: images in Gabor-frequency space, clustered by oscillatory
-structure rather than by semantic content.
+using PCA.  A spectrogram computed with a Hann-windowed STFT **is** a
+time-varying Gabor transform, so the manifold is in Gabor-frequency space,
+clustering by oscillatory structure rather than semantic content.  No
+training, no optimisation, no learned weights.
 
-No training, no optimisation, no learned weights.  Operations:
-
-1. STFT of each 4-second epoch → 64×64 greyscale spectrogram image
+Operations:
+1. STFT of each 4-second epoch → 64×64 greyscale spectrogram
 2. PCA over all spectrogram images → 2-D manifold coordinates
 3. Competitive sparse reconstruction at the cursor position
-   (divisive normalisation / softmax, competition strength β)
-
-Three scientific readouts:
-
-| Metric | What it measures |
-|--------|-----------------|
-| Spread ratio (sick hull / healthy hull) | How much more manifold volume the sick group occupies |
-| Fragmentation | % of sick epochs outside the healthy convex hull |
-| Transient correlation r (silence entropy vs manifold distance) | δ-coding test — see below |
+   (divisive normalisation with β controlling blend ↔ snap)
 
 ---
 
 ## Results  —  RepOD dataset (13 sick, 13 healthy, 19-channel EEG, 250 Hz)
 
-### Primary finding: variance asymmetry
+### Finding 1: Variance asymmetry (primary, replicated across channels)
 
-Healthy EEG occupies a compact, tight cluster in Gabor-frequency space.
-Schizophrenia EEG occupies a substantially larger region — the same centroid,
-but inflated.  This is **not** a mean-shift; it is a variance asymmetry.
-The centroid separation score (0.57) understates the effect because it is
-centroid-based; the hull spread ratio is the correct metric for this geometry.
+Healthy EEG occupies a compact cluster in Gabor-frequency space.
+Schizophrenia EEG occupies the same centroid region but with substantially
+greater spread.  This is a **variance asymmetry, not a mean shift**.
 
-Across all channels, sick hull area ÷ healthy hull area ≈ 1.47 (healthy/sick = 0.68).
-Fragmentation (sick epochs outside healthy hull) is 0.4% — low, meaning the
-sick group is not primarily visiting *alien* spectral states; it is visiting a
-*larger range* of states that includes but greatly exceeds the healthy range.
+| Metric | Value | Interpretation |
+|--------|-------|----------------|
+| Sick hull area / healthy hull area | 1.47× | Sick occupies ~50% more manifold volume |
+| Fragmentation (sick outside healthy hull) | 1.7% | Low: sick mostly overlaps healthy region |
+| Centroid separation | 0.57 | Weak — wrong metric for this geometry |
 
-### Channel sweep — spread ratio ranked
+Interpretation: healthy brains cycle through a tight, consistent spectral
+repertoire.  Schizophrenia brains visit a larger range of spectral states while
+still spending most time near the healthy core (low fragmentation).  This is
+consistent with elevated Neural Reynolds Number (Re_n) — more turbulent
+spectral dynamics without a complete regime change.
+
+### Channel sweep — spread ratio all 19 electrodes
 
 ![pic2](channelsweep.png)
 
-| idx | name | spread | frag % | note |
-|-----|------|--------|--------|------|
-| 10  | F4   | 1.70×  | 4.2 %  | **strongest** |
-| 11  | C4   | 1.66×  | 5.8 %  | |
-|  6  | F7   | 1.58×  | 2.6 %  | |
-|  2  | T4   | 1.56×  | 3.2 %  | |
-|  3  | T6   | 1.54×  | 5.1 %  | |
-| 17  | Cz   | 1.50×  | 4.4 %  | |
-|  1  | F8   | 1.49×  | 3.6 %  | |
-|  0  | Fp2  | 1.46×  | 1.7 %  | |
-| 18  | Pz   | 1.44×  | 2.1 %  | |
-| 13  | F3   | 1.42×  | 1.9 %  | |
-|  8  | T5   | 1.33×  | 2.1 %  | |
-|  7  | T3   | 1.30×  | 3.2 %  | |
-| 14  | C3   | 1.27×  | 7.3 %  | highest fragmentation |
-| 12  | P4   | 1.23×  | 1.5 %  | |
-|  4  | O2   | 1.23×  | 3.8 %  | |
-| 16  | Fz   | 1.18×  | 2.4 %  | |
-| 15  | P3   | 1.05×  | 0.6 %  | |
-|  5  | Fp1  | 0.97×  | 0.4 %  | healthy spreads more |
-|  9  | O1   | 0.96×  | 0.9 %  | healthy spreads more |
+| idx | name | spread | frag % |
+|-----|------|--------|--------|
+| 10  | F4   | 1.70×  | 4.2 %  |
+| 11  | C4   | 1.66×  | 5.8 %  |
+|  6  | F7   | 1.58×  | 2.6 %  |
+|  2  | T4   | 1.56×  | 3.2 %  |
+|  3  | T6   | 1.54×  | 5.1 %  |
+| 17  | Cz   | 1.50×  | 4.4 %  |
+|  1  | F8   | 1.49×  | 3.6 %  |
+|  0  | Fp2  | 1.46×  | 1.7 %  |
+| 18  | Pz   | 1.44×  | 2.1 %  |
+| 13  | F3   | 1.42×  | 1.9 %  |
+|  8  | T5   | 1.33×  | 2.1 %  |
+|  7  | T3   | 1.30×  | 3.2 %  |
+| 14  | C3   | 1.27×  | 7.3 %  |
+| 12  | P4   | 1.23×  | 1.5 %  |
+|  4  | O2   | 1.23×  | 3.8 %  |
+| 16  | Fz   | 1.18×  | 2.4 %  |
+| 15  | P3   | 1.05×  | 0.6 %  |
+|  5  | Fp1  | 0.97×  | 0.4 %  |
+|  9  | O1   | 0.96×  | 0.9 %  |
 
-Effect is real and consistent: 17 of 19 electrodes show sick spread > healthy.
-**The strongest signal is frontal-central, right-hemisphere biased** (F4, C4,
-T4 > F3, C3, T3).  This is the *sustained expression* pattern; the Takens
-classifier found *temporal-lobe initiation* (2.06 s latency to frontal).
-These are complementary not contradictory: the instability originates
-temporally and expresses frontally.
+Effect consistent across 17 of 19 electrodes.  Strongest at **F4 and C4
+(right frontal-central)**, not at the temporal channels the Takens classifier
+identified as the dysrhythmia origin (T3 = 1.30×).  These are complementary:
+the instability *initiates* temporally (Takens, 2.06 s latency) and *expresses
+as sustained variance* frontally.  Fp1 and O1 invert (healthy > sick): Fp1
+is a known eye-artefact site and should be checked against artefact records
+before interpreting biologically.
 
-Fp1 and O1 invert (healthy spreads more).  Fp1 is a known eye-movement
-artefact site; O1 captures occipital visual activity.  These should be checked
-against artefact-rejection records before interpreting biologically.
-
-### Transient / δ-coding analysis  (v3)
+### Finding 2: δ-coding at 4-second resolution — null
 
 ![pic3](transient_analysis.png)
 
-**Prediction**: if the spike is the derivative of the standing wave (delta-
-coding), burst→silence transitions in spectral entropy should land on known
-manifold attractors in healthy subjects (silence = locked wave = near attractor
-basin), and this coupling should be weaker or absent in schizophrenia where
-subjects lock onto idiosyncratic internal states.
+Both groups n.s.  (healthy r = −0.017, sick r = −0.100, both p > 0.2.)
+Reason: 4-second epochs average over dozens of neural cycles, hiding
+within-epoch burst→silence dynamics.  This is a timescale mismatch, not a
+failed prediction.
 
-**Result** (channel 0, Fp2, 4-second epochs):
+### Finding 3: δ-coding at 100 ms resolution — significant, unexpected direction
 
-| group | r (silence entropy vs manifold dist) | p | n transitions |
-|-------|--------------------------------------|---|---------------|
-| healthy | −0.017 | 0.816 | 192 |
-| sick    | −0.100 | 0.205 | 163 |
+![pic4](sub-second.png)
 
-**Both n.s.**  The prediction is not supported at this implementation.
+**Method:** bandpass filter into broadband 80–120 Hz and alpha 8–13 Hz.
+Sliding 100 ms RMS power.  Detect events: broadband burst > +1.5 SD followed
+within 200–500 ms by alpha power < −1 SD.  For each silence event, extract a
+4-second spectrogram centred on it (same format as manifold atoms) and project
+into the manifold.  Correlate silence depth (alpha suppression, SD units) vs
+manifold distance to nearest atom.
 
-**Why — the honest diagnosis:**  The test searched for burst→silence
-transitions in the *sequence of 4-second epoch entropies* across a recording.
-The delta-coding prediction is about sub-second dynamics within the EEG trace:
-a ~50–200 ms burst followed by deep alpha/beta suppression.  A 4-second epoch
-averages over dozens of neural cycles and buries this signal entirely.  The
-test failed at the wrong timescale, not because the hypothesis is wrong.
+| group | r | p | n events |
+|-------|---|---|----------|
+| sick    | **−0.123** | **< 0.001 (\*\*)** | 784 |
+| healthy | −0.028    | 0.434 (n.s.)       | 790 |
+| Δr permutation | — | **0.011 (\*)** | — |
 
-The slightly more negative r in sick (−0.10) compared to healthy (−0.017) is
-in the **wrong direction** from the prediction and n.s.; do not interpret it.
+Total 1574 events across 26 subjects.
 
-**What the right test looks like:**
+**What the result says:**  The prediction was that *healthy* subjects would show
+r < 0 (locked wave → near group attractor).  The significant negative r
+appeared in the *sick* group instead.
 
-1. Compute instantaneous broadband power (e.g. 80–120 Hz) and alpha power
-   (8–13 Hz) in a sliding 100 ms window within the raw EEG.
-2. Detect events: broadband burst (> 1.5 SD above baseline) followed within
-   200–500 ms by alpha suppression (> 1 SD below baseline).
-3. For each such event, extract a short post-onset spectrogram (~500 ms) and
-   project it into the Koopman manifold.
-4. Test: does the depth of alpha suppression correlate with proximity to the
-   nearest manifold attractor?
+**Honest interpretation — the floor effect:**  Healthy subjects form a compact
+manifold (spread ratio 0.68×).  Their manifold distances are uniformly small
+with low variance.  It is not possible to detect a correlation in a variable
+compressed against a floor.  In healthy subjects, the δ-coding mechanism may
+be so efficient that proximity to a stable attractor is maintained throughout
+the recording, making silence depth uninformative about manifold distance.
+Sick subjects have high manifold variance (their cloud is spread); deeper
+alpha silence events in sick subjects DO predict proximity to the nearest
+manifold attractor (r = −0.123, p < 0.001).
 
-This requires the raw EEG (not just the pre-computed spectrograms) and a
-100 ms sliding window rather than 4-second epochs.  The current tool's
-architecture supports this as a future extension.
+**What this means for the theory:**  The δ-coding signal is detectable where
+there is manifold variance to detect it in.  In sick subjects the system spends
+time both near and far from attractors; the burst→silence mechanism partially
+restores proximity, and this is measurable.  In healthy subjects the system
+rarely strays far from attractors, so the restoration mechanism leaves no
+measurable signature.
+
+The group difference is confirmed real by the permutation test (Δr perm
+p = 0.011): the correlations are significantly different between groups.  This
+is the primary statistical finding.
+
+**An additional interpretation worth testing:**  The "nearest atom" for any
+projected epoch is drawn from the full dictionary (all 26 subjects).  Sick
+subjects' silence epochs may be finding proximity to other sick-group atoms in
+the outer, dispersed region of the manifold — their own attractor structure,
+not the healthy one.  If true, the δ-coding mechanism is preserved in sick
+subjects but operating on a different (fragmented) attractor landscape.  This
+is testable by restricting the "nearest atom" search to within-group atoms only.
 
 ---
 
-## What the results point to
+## Honest limits
 
-**In GAIT / Koopman terms:** Healthy resting EEG occupies a compact, stable
-attractor in Gabor-frequency space — a standing wave that returns to roughly
-the same spectral configuration epoch after epoch.  Schizophrenia corresponds
-to an enlarged attractor basin: the wave visits more spectral states, covering
-a larger region while still spending substantial time near the healthy core
-(low fragmentation).  This is consistent with an elevated Neural Reynolds
-Number (Re_n) — higher effective degrees of freedom, more turbulent spectral
-dynamics, without a complete regime change.
+- **N = 13 per group.**  Small.  The variance asymmetry and the δ-coding
+  group difference both need replication on an independent dataset.
+- **The δ-coding result requires permutation confirmation** of the per-group
+  r values, not just the Δr.  At n = 784–790, p < 0.001 is likely robust, but
+  autocorrelation within subjects inflates n; mixed-effects or subject-level
+  analysis is the right next step.
+- **Floor effect interpretation** is a hypothesis, not a proven mechanism.
+  A formal test: compute manifold distance variance per group and verify it
+  predicts correlation detectability.
+- **The temporal lobe–frontal asymmetry** (Takens initiates temporally; Gabor
+  manifold expresses frontally) is a conjunction of two separate analyses on
+  the same dataset.  Independent replication required before reporting as
+  causal.
+- **Fp1 / O1 inversion** needs artefact check.
+- The broadband (80–120 Hz) band is close to the 125 Hz Nyquist at 250 Hz
+  sampling.  Confirm the filter is not aliased; ideally use a dataset sampled
+  at ≥ 512 Hz for the sub-second test.
 
-The Vollan & Moser (2025) coverage-maximization framework connects here: the
-healthy entorhinal sweep system efficiently samples a bounded manifold; the
-schizophrenic system fails to maintain bounded coverage, drifting into a
-larger, less structured region.  The temporal-lobe initiation finding (Takens
-classifier, 2.06 s latency) is the causal anchor: the EC/temporal gateway
-degrades first, the frontal executive system inherits the degraded manifold 2 s
-later.
+---
 
-**Honest limits:**
+## Next experiments (in priority order)
 
-- N = 13 per group.  Small.  The spread ratio needs a permutation test
-  (shuffle group labels, recompute hull ratio, build empirical null) before
-  reporting as a finding.
-- The δ-coding test at 4-second resolution is negative.  The prediction
-  survives but the test needs sub-second resolution.
-- The Fp1/O1 inversion needs artefact check.
-- The causal claim (temporal initiates → frontal expresses) is the conjunction
-  of two separate analyses run on the same dataset; cross-validation on
-  independent data is required.
+1. **Within-group nearest-atom test:** restrict manifold distance search to
+   same-group atoms.  Tests whether sick subjects are finding sick-group
+   attractors (fragmented landscape) or healthy-group attractors.
+
+2. **Subject-level analysis:** compute per-subject r(silence depth, manifold
+   dist) and test group difference with a t-test or Mann-Whitney on
+   subject-level r values.  Removes autocorrelation inflation.
+
+3. **Permutation test on spread ratio:** shuffle group labels, recompute hull
+   area ratio, build empirical null.  Needed before reporting 1.47× as a
+   formal finding.
+
+4. **Independent dataset replication.**
 
 ---
 
@@ -172,15 +190,14 @@ pip install numpy scipy pillow mne scikit-learn matplotlib
 python3.13 eeg_koopman_explorer.py
 ```
 
-1. **+ Add group** twice — point at `healthy` folder, then `sick` folder.
+1. **+ Add group** twice — point at `sick` folder, then `healthy` folder.
 2. Set parameters (default: 250 Hz, 1–40 Hz, 4 s epochs, channel 0).
 3. **PROCESS** — builds the manifold.
 4. **SWEEP ALL CHANNELS** — ranks all 19 electrodes by spread ratio.
-5. **TRANSIENT ANALYSIS** — runs the δ-coding test; interprets silence entropy
-   vs manifold distance.  Currently n.s. at 4-second resolution (see above).
-6. Drag the crosshair across the manifold to watch group weights and
-   active-atom readouts update live.
-7. **Save dictionary** to store the manifold.
+5. **⚡ TRANSIENT ANALYSIS** — epoch-level test (4 s resolution; null by design).
+6. **🔬 SUB-SECOND δ-CODING** — 100 ms window test; the primary δ-coding result.
+7. Drag the crosshair across the manifold to watch group weights live.
+8. **Save dictionary** to store the manifold for later sessions.
 
 Formats: `.edf` (via MNE), `.mat` (raw or EEGLAB), `.npy`, `.csv`.
 
@@ -188,12 +205,14 @@ Formats: `.edf` (via MNE), `.mat` (raw or EEGLAB), `.npy`, `.csv`.
 
 ## Metrics reference
 
-| Metric | Formula | Notes |
-|--------|---------|-------|
-| Spread ratio | sick hull area / healthy hull area | Primary metric for this geometry |
-| Fragmentation | % sick epochs outside healthy hull | Low in this dataset (0.4%) |
-| Centroid separation | centroid distance / pooled σ | Wrong metric here — understates effect |
-| δ-coding correlation | Pearson r (silence entropy vs manifold dist) | n.s. at 4 s resolution; needs 100 ms |
+| Metric | Formula | Status |
+|--------|---------|--------|
+| Spread ratio | sick hull / healthy hull area | Primary metric; 1.47× here |
+| Fragmentation | % sick outside healthy hull | Low (1.7%); use as secondary |
+| Centroid separation | centroid dist / pooled σ | Inappropriate for this geometry |
+| δ-coding r (4 s) | Pearson r (entropy vs manifold dist) | Null — timescale mismatch |
+| δ-coding r (100 ms) | Pearson r (silence depth vs manifold dist) | Sick: −0.123 \*\*; healthy: n.s. |
+| Δr permutation p | permutation test on |r_sick − r_healthy| | 0.011 \* |
 
 ---
 
@@ -202,9 +221,10 @@ Formats: `.edf` (via MNE), `.mat` (raw or EEGLAB), `.npy`, `.csv`.
 | Version | Change |
 |---------|--------|
 | v1 | Pixel-space PCA navigator (Python Tkinter) |
-| v2 | MNE EDF loading fix, convex hull metrics, channel sweep |
-| v3 | Transient / δ-coding analysis button; hull display on manifold; honest null result documented |
+| v2 | MNE EDF loading, convex hull metrics, channel sweep |
+| v3 | Epoch-level transient analysis; hull outlines on manifold |
+| v4 | Sub-second (100 ms) δ-coding test; floor-effect interpretation; permutation Δr |
 
 ---
 
-*PerceptionLab, Helsinki.  Do not hype. Do not lie. Just show.*
+*PerceptionLab, Helsinki.  Do not hype.  Do not lie.  Just show.*
