@@ -1,5 +1,7 @@
 # EEG Koopman Explorer
 
+![pic](koopman_explorer.png)
+
 A zero-parameter tool for exploring EEG recordings as spectrograms on a
 2-D Koopman manifold, with competitive sparse reconstruction and group
 separation metrics.
@@ -35,6 +37,8 @@ manifold:
 ---
 
 ## Results — RepOD dataset (13 sick, 13 healthy, 19-channel EEG, 250 Hz)
+
+![pic2]("channel explorer.png")
 
 ### Channel sweep — spread ratio ranked
 
